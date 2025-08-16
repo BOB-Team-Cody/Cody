@@ -167,14 +167,15 @@ class AnalysisService:
             label=rel_path.stem,
             dead=False,
             call_count=0,
-            class_name=None  # Modules don't belong to classes
+            source_code=content
         )]
         
         # Analyze AST nodes
         analyzer = ASTAnalyzer(
             file_path=str(rel_path),
             dead_code_items=self.dead_code_items,
-            call_counts=self.call_counts
+            call_counts=self.call_counts,
+            source_content=content
         )
         analyzer.visit(tree)
         
@@ -195,33 +196,15 @@ class AnalysisService:
 class ASTAnalyzer(ast.NodeVisitor):
     """AST visitor to extract functions, classes, and call relationships."""
     
-    def __init__(self, file_path: str, dead_code_items: Set[str], call_counts: Dict[str, int]):
+    def __init__(self, file_path: str, dead_code_items: Set[str], call_counts: Dict[str, int], source_content: str):
         self.file_path = file_path
         self.dead_code_items = dead_code_items
         self.call_counts = call_counts
+        self.source_content = source_content
+        self.source_lines = source_content.splitlines()
         self.nodes: List[CodeNode] = []
         self.edges: List[CodeEdge] = []
         self.current_scope: List[str] = []
-        self.current_class_stack: List[str] = []  # Track current class names
-        self.imports: Dict[str, str] = {}  # symbol_name -> actual_module_path
-        self.symbol_definitions: Dict[str, str] = {}  # symbol_name -> definition_location
-    
-    def visit_Import(self, node: ast.Import) -> None:
-        """Visit import statements."""
-        for alias in node.names:
-            module_name = alias.name
-            import_name = alias.asname or alias.name
-            self.imports[import_name] = module_name
-    
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
-        """Visit from...import statements."""
-        if node.module:
-            for alias in node.names:
-                symbol_name = alias.name
-                import_name = alias.asname or alias.name
-                # Convert relative path to file path format (use forward slash for consistency)
-                module_path = node.module.replace('.', '/')
-                self.imports[import_name] = f"{module_path}.py:{symbol_name}"
     
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         """Visit function definitions."""
@@ -241,8 +224,8 @@ class ASTAnalyzer(ast.NodeVisitor):
         is_dead = func_id in self.dead_code_items
         call_count = self.call_counts.get(func_name, 0)
         
-        # Determine class name (if function is inside a class)
-        class_name = self.current_class_stack[-1] if self.current_class_stack else None
+        # Extract function source code
+        func_source = self._extract_function_source(node)
         
         func_node = CodeNode(
             id=func_id,
@@ -251,7 +234,7 @@ class ASTAnalyzer(ast.NodeVisitor):
             label=func_name,
             dead=is_dead,
             call_count=call_count,
-            class_name=class_name
+            source_code=func_source
         )
         self.nodes.append(func_node)
         
@@ -275,6 +258,9 @@ class ASTAnalyzer(ast.NodeVisitor):
         is_dead = class_id in self.dead_code_items
         call_count = self.call_counts.get(class_name, 0)
         
+        # Extract class source code
+        class_source = self._extract_class_source(node)
+        
         class_node = CodeNode(
             id=class_id,
             type="class",
@@ -282,13 +268,12 @@ class ASTAnalyzer(ast.NodeVisitor):
             label=class_name,
             dead=is_dead,
             call_count=call_count,
-            class_name=None  # Classes don't have a parent class name in this context
+            source_code=class_source
         )
         self.nodes.append(class_node)
         
         # Enter class scope
         self.current_scope.append(class_name)
-        self.current_class_stack.append(class_name)  # Track class for nested functions
         
         # Visit class body
         for stmt in node.body:
@@ -296,7 +281,6 @@ class ASTAnalyzer(ast.NodeVisitor):
         
         # Exit class scope
         self.current_scope.pop()
-        self.current_class_stack.pop()
     
     def visit_Call(self, node: ast.Call) -> None:
         """Visit function calls."""
@@ -304,9 +288,7 @@ class ASTAnalyzer(ast.NodeVisitor):
         if func_name:
             current_func = ".".join(self.current_scope) if self.current_scope else "__module__"
             caller_id = f"{self.file_path}:{current_func}"
-            
-            # Resolve target to actual definition location
-            callee_id = self._resolve_target(func_name)
+            callee_id = f"{self.file_path}:{func_name}"
             
             edge = CodeEdge(
                 source=caller_id,
@@ -326,56 +308,36 @@ class ASTAnalyzer(ast.NodeVisitor):
             return node.attr
         return None
     
-    def _resolve_target(self, func_name: str) -> str:
-        """Resolve function call target to actual definition location."""
-        # Check if it's an imported symbol
-        if func_name in self.imports:
-            resolved_location = self.imports[func_name]
-            # If it already contains file and symbol info
-            if ':' in resolved_location:
-                return resolved_location
+    def _extract_function_source(self, node: ast.FunctionDef) -> str:
+        """Extract source code for a function definition."""
+        try:
+            # Get line numbers (1-indexed)
+            start_line = node.lineno - 1
+            end_line = node.end_lineno if hasattr(node, 'end_lineno') and node.end_lineno else start_line + 1
+            
+            # Extract lines from source
+            if start_line < len(self.source_lines) and end_line <= len(self.source_lines):
+                function_lines = self.source_lines[start_line:end_line]
+                return '\n'.join(function_lines)
             else:
-                # It's a module import, keep as current file
-                return f"{self.file_path}:{func_name}"
-        
-        # Check if it's a builtin function using Python's builtins module
-        if self._is_builtin_function(func_name):
-            return f"builtins:{func_name}"
-        
-        # Default: assume it's in the same file
-        return f"{self.file_path}:{func_name}"
+                return f"def {node.name}(...):"
+        except Exception as e:
+            logger.warning(f"Failed to extract function source for {node.name}: {e}")
+            return f"def {node.name}(...):"
     
-    def _is_builtin_function(self, func_name: str) -> bool:
-        """Check if function is a Python builtin function or common method."""
-        import builtins
-        import types
-        
-        # 1. Check if it's in Python's builtins module
-        if hasattr(builtins, func_name):
-            builtin_obj = getattr(builtins, func_name)
-            return callable(builtin_obj)
-        
-        # 2. Dynamically get all builtin types from builtins module
-        builtin_types = []
-        for name in dir(builtins):
-            obj = getattr(builtins, name)
-            # Check if it's a type (class) and not a function/exception
-            if isinstance(obj, type) and not issubclass(obj, BaseException):
-                builtin_types.append(obj)
-        
-        # Check if it's a method available on any builtin type
-        for builtin_type in builtin_types:
-            if hasattr(builtin_type, func_name):
-                attr = getattr(builtin_type, func_name)
-                # Check if it's a method (callable and not a property/descriptor)
-                if callable(attr):
-                    return True
-        
-        # 3. Check object base class methods (inherited by all objects)
-        if hasattr(object, func_name):
-            attr = getattr(object, func_name)
-            if callable(attr):
-                return True
-        
-        return False
-    
+    def _extract_class_source(self, node: ast.ClassDef) -> str:
+        """Extract source code for a class definition."""
+        try:
+            # Get line numbers (1-indexed)
+            start_line = node.lineno - 1
+            end_line = node.end_lineno if hasattr(node, 'end_lineno') and node.end_lineno else start_line + 1
+            
+            # Extract lines from source
+            if start_line < len(self.source_lines) and end_line <= len(self.source_lines):
+                class_lines = self.source_lines[start_line:end_line]
+                return '\n'.join(class_lines)
+            else:
+                return f"class {node.name}:"
+        except Exception as e:
+            logger.warning(f"Failed to extract class source for {node.name}: {e}")
+            return f"class {node.name}:"

@@ -114,6 +114,9 @@ async def root():
             "GET /statistics": "Get analysis statistics",
             "GET /health": "Health check",
             "DELETE /clear": "Clear analysis data",
+            "GET /functions/search/{function_name}": "Search functions by name",
+            "GET /functions/id/{function_id}": "Get function by ID",
+            "GET /functions/file/{file_path}": "Get functions by file",
             "GET /docs": "API documentation"
         }
     }
@@ -173,6 +176,57 @@ async def clear_data(controller: AnalysisController = Depends(get_analysis_contr
         Success status
     """
     return await controller.clear_database()
+
+
+@app.get("/functions/search/{function_name}")
+async def search_functions(
+    function_name: str,
+    controller: AnalysisController = Depends(get_analysis_controller)
+):
+    """
+    Search for functions by name pattern.
+    
+    Args:
+        function_name: Name or pattern to search for
+        
+    Returns:
+        List of matching functions with their source code
+    """
+    return await controller.search_functions_by_name(function_name)
+
+
+@app.get("/functions/id/{function_id:path}")
+async def get_function_by_id(
+    function_id: str,
+    controller: AnalysisController = Depends(get_analysis_controller)
+):
+    """
+    Get a specific function by its ID.
+    
+    Args:
+        function_id: The function ID to search for
+        
+    Returns:
+        Function data with source code
+    """
+    return await controller.get_function_by_id(function_id)
+
+
+@app.get("/functions/file/{file_path:path}")
+async def get_functions_by_file(
+    file_path: str,
+    controller: AnalysisController = Depends(get_analysis_controller)
+):
+    """
+    Get all functions in a specific file.
+    
+    Args:
+        file_path: Path to the file
+        
+    Returns:
+        List of functions in the file with their source code
+    """
+    return await controller.search_functions_by_file(file_path)
 
 
 @app.get("/frontend")

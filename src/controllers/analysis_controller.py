@@ -208,7 +208,7 @@ class AnalysisController:
                 "type": node.type,
                 "dead": node.dead,
                 "callCount": node.call_count,
-                "className": node.class_name,
+                "sourceCode": node.source_code or "",
                 "size": 3.0 if node.type == "class" else (1.5 + node.call_count * 0.2)
             }
             self.memory_storage["nodes"].append(viz_node)
@@ -232,3 +232,107 @@ class AnalysisController:
             # Adjust size based on actual call count
             base_size = 3.0 if node["type"] == "class" else 1.5
             node["size"] = base_size + (node["callCount"] * 0.2)
+    
+    async def search_functions_by_name(self, function_name: str) -> Dict[str, Any]:
+        """Search for functions by name pattern."""
+        try:
+            if self.database_service.is_connected():
+                functions = self.database_service.search_functions_by_name(function_name)
+            else:
+                # Search in memory storage
+                functions = []
+                for node in self.memory_storage["nodes"]:
+                    if (node["type"] == "function" and 
+                        function_name.lower() in node["name"].lower()):
+                        functions.append({
+                            "id": node["id"],
+                            "name": node["name"],
+                            "file": node["file"],
+                            "sourceCode": node.get("sourceCode", ""),
+                            "dead": node["dead"],
+                            "callCount": node["callCount"]
+                        })
+            
+            return {
+                "success": True,
+                "count": len(functions),
+                "functions": functions
+            }
+            
+        except Exception as e:
+            logger.error(f"Error searching functions: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to search functions: {str(e)}"
+            )
+    
+    async def get_function_by_id(self, function_id: str) -> Dict[str, Any]:
+        """Get a specific function by its ID."""
+        try:
+            if self.database_service.is_connected():
+                function = self.database_service.get_function_by_id(function_id)
+            else:
+                # Search in memory storage
+                function = None
+                for node in self.memory_storage["nodes"]:
+                    if node["id"] == function_id and node["type"] == "function":
+                        function = {
+                            "id": node["id"],
+                            "name": node["name"],
+                            "file": node["file"],
+                            "sourceCode": node.get("sourceCode", ""),
+                            "dead": node["dead"],
+                            "callCount": node["callCount"]
+                        }
+                        break
+            
+            if function is None:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail=f"Function with ID '{function_id}' not found"
+                )
+            
+            return function
+            
+        except HTTPException:
+            raise
+        except Exception as e:
+            logger.error(f"Error getting function by ID: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to get function: {str(e)}"
+            )
+    
+    async def search_functions_by_file(self, file_path: str) -> Dict[str, Any]:
+        """Get all functions in a specific file."""
+        try:
+            if self.database_service.is_connected():
+                functions = self.database_service.search_functions_by_file(file_path)
+            else:
+                # Search in memory storage
+                functions = []
+                for node in self.memory_storage["nodes"]:
+                    if (node["type"] == "function" and 
+                        node["file"] == file_path):
+                        functions.append({
+                            "id": node["id"],
+                            "name": node["name"],
+                            "file": node["file"],
+                            "sourceCode": node.get("sourceCode", ""),
+                            "dead": node["dead"],
+                            "callCount": node["callCount"]
+                        })
+            
+            return {
+                "success": True,
+                "file": file_path,
+                "count": len(functions),
+                "functions": functions
+            }
+            
+        except Exception as e:
+            logger.error(f"Error searching functions by file: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to search functions in file: {str(e)}"
+            )
