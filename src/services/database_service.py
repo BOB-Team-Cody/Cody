@@ -175,7 +175,7 @@ class DatabaseService:
                 n.dead = $dead,
                 n.type = $type,
                 n.callCount = $callCount,
-                n.className = $className
+                n.sourceCode = $sourceCode
             """
         elif node_type == "Class":
             query = """
@@ -185,7 +185,7 @@ class DatabaseService:
                 n.dead = $dead,
                 n.type = $type,
                 n.callCount = $callCount,
-                n.className = $className
+                n.sourceCode = $sourceCode
             """
         elif node_type == "Module":
             query = """
@@ -195,7 +195,7 @@ class DatabaseService:
                 n.dead = $dead,
                 n.type = $type,
                 n.callCount = $callCount,
-                n.className = $className
+                n.sourceCode = $sourceCode
             """
         else:
             query = """
@@ -205,7 +205,7 @@ class DatabaseService:
                 n.dead = $dead,
                 n.type = $type,
                 n.callCount = $callCount,
-                n.className = $className
+                n.sourceCode = $sourceCode
             """
         
         session.run(query, {
@@ -215,7 +215,7 @@ class DatabaseService:
             "dead": node.dead,
             "type": node.type,
             "callCount": node.call_count,
-            "className": node.class_name
+            "sourceCode": getattr(node, 'source_code', '')
         })
     
     def _create_relationship(self, session, edge: CodeEdge) -> None:
@@ -364,3 +364,108 @@ class DatabaseService:
         except Exception as e:
             logger.error(f"Error getting statistics: {e}")
             return {}
+    
+    def search_functions_by_name(self, function_name: str) -> List[Dict[str, Any]]:
+        """Search for functions by name pattern."""
+        if not self.is_connected():
+            logger.warning("Not connected to database")
+            return []
+        
+        try:
+            with self.driver.session() as session:
+                query = """
+                MATCH (n:Function)
+                WHERE n.name CONTAINS $name_pattern
+                RETURN n.id as id, n.name as name, n.file as file, 
+                       n.sourceCode as sourceCode, n.dead as dead, n.callCount as callCount
+                ORDER BY n.name
+                """
+                
+                result = session.run(query, {"name_pattern": function_name})
+                functions = []
+                
+                for record in result:
+                    function = {
+                        "id": record["id"],
+                        "name": record["name"], 
+                        "file": record["file"],
+                        "sourceCode": record["sourceCode"],
+                        "dead": record["dead"] if record["dead"] is not None else False,
+                        "callCount": record["callCount"] or 0
+                    }
+                    functions.append(function)
+                
+                return functions
+                
+        except Exception as e:
+            logger.error(f"Error searching functions: {e}")
+            return []
+    
+    def get_function_by_id(self, function_id: str) -> Optional[Dict[str, Any]]:
+        """Get a specific function by its ID."""
+        if not self.is_connected():
+            logger.warning("Not connected to database")
+            return None
+        
+        try:
+            with self.driver.session() as session:
+                query = """
+                MATCH (n:Function {id: $function_id})
+                RETURN n.id as id, n.name as name, n.file as file,
+                       n.sourceCode as sourceCode, n.dead as dead, n.callCount as callCount
+                """
+                
+                result = session.run(query, {"function_id": function_id})
+                record = result.single()
+                
+                if record:
+                    return {
+                        "id": record["id"],
+                        "name": record["name"],
+                        "file": record["file"],
+                        "sourceCode": record["sourceCode"],
+                        "dead": record["dead"] if record["dead"] is not None else False,
+                        "callCount": record["callCount"] or 0
+                    }
+                
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting function by ID: {e}")
+            return None
+    
+    def search_functions_by_file(self, file_path: str) -> List[Dict[str, Any]]:
+        """Get all functions in a specific file."""
+        if not self.is_connected():
+            logger.warning("Not connected to database")
+            return []
+        
+        try:
+            with self.driver.session() as session:
+                query = """
+                MATCH (n:Function)
+                WHERE n.file = $file_path
+                RETURN n.id as id, n.name as name, n.file as file,
+                       n.sourceCode as sourceCode, n.dead as dead, n.callCount as callCount
+                ORDER BY n.name
+                """
+                
+                result = session.run(query, {"file_path": file_path})
+                functions = []
+                
+                for record in result:
+                    function = {
+                        "id": record["id"],
+                        "name": record["name"],
+                        "file": record["file"],
+                        "sourceCode": record["sourceCode"],
+                        "dead": record["dead"] if record["dead"] is not None else False,
+                        "callCount": record["callCount"] or 0
+                    }
+                    functions.append(function)
+                
+                return functions
+                
+        except Exception as e:
+            logger.error(f"Error searching functions by file: {e}")
+            return []
