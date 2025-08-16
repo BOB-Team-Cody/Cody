@@ -85,6 +85,11 @@ module.exports = (env, argv) => {
             '^/api': '',
           },
         },
+        {
+          context: ['/refactor'],
+          target: 'http://localhost:8000',
+          changeOrigin: true,
+        },
       ],
     },
     optimization: {

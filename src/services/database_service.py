@@ -27,7 +27,7 @@ class DatabaseService:
             password: Database password
         """
         # Read from environment variables with fallbacks
-        self.uri = uri or os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        self.uri = uri or os.getenv("NEO4J_URI", "bolt://code-weaver-neo4j:7687")
         self.username = username or os.getenv("NEO4J_USERNAME", "neo4j")
         self.password = password or os.getenv("NEO4J_PASSWORD", "codycody")
         self.driver: Optional[Driver] = None
@@ -419,7 +419,8 @@ class DatabaseService:
         try:
             with self.driver.session() as session:
                 query = """
-                MATCH (n:Function {id: $function_id})
+                MATCH (n {id: $function_id})
+                WHERE n.type = 'function'
                 RETURN n.id as id, n.name as name, n.file as file,
                        n.sourceCode as sourceCode, n.dead as dead, n.callCount as callCount
                 """

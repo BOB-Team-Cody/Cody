@@ -46,7 +46,7 @@ const RefactoringPanel: React.FC<RefactoringPanelProps> = ({ selectedNode }) => 
       }
 
       // Create new EventSource for streaming
-      const eventSource = new EventSource(`/refactor/${encodeURIComponent(selectedNode.id)}`);
+      const eventSource = new EventSource(`http://localhost:8000/refactor?function_id=${encodeURIComponent(selectedNode.id)}`);
       eventSourceRef.current = eventSource;
 
       eventSource.onmessage = (event) => {
