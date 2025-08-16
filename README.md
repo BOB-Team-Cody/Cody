@@ -1,0 +1,9 @@
+```
+1. uv venv
+2. uv sync
+3. .\.venv\Scripts\activate
+4. docker-compose up --build -d
+5. cd frontend/
+6. npm install
+7. npm run dev
+```
