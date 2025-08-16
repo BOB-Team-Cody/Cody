@@ -13,10 +13,11 @@ interface CodeNodeProps {
 const CodeNode: React.FC<CodeNodeProps> = ({ node, isSelected, onClick }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const [hovered, setHovered] = useState(false);
+  const [showTooltip, setShowTooltip] = useState(false);
   
   // Create geometry based on node type
   const geometry = React.useMemo(() => {
-    const scale = node.scale || 1;
+    const scale = (node.scale || 1) * 1.8; // 전체적으로 80% 크기 증가
     
     switch (node.type) {
       case 'class':
@@ -32,14 +33,14 @@ const CodeNode: React.FC<CodeNodeProps> = ({ node, isSelected, onClick }) => {
   
   // Create material based on node properties
   const material = React.useMemo(() => {
-    const baseColor = new THREE.Color(node.color);
-    const emissiveColor = new THREE.Color(node.emissive);
+    const baseColor = new THREE.Color(node.color).multiplyScalar(1.5); // 기본 밝기 50% 증가
+    const emissiveColor = new THREE.Color(node.emissive).multiplyScalar(2); // 발광 2배 증가
     
     return new THREE.MeshPhongMaterial({
       color: baseColor,
       emissive: emissiveColor,
       transparent: true,
-      opacity: node.opacity,
+      opacity: Math.min(node.opacity * 1.3, 1), // 투명도 30% 감소 (더 진하게)
       shininess: 100,
     });
   }, [node.color, node.emissive, node.opacity]);
@@ -74,13 +75,13 @@ const CodeNode: React.FC<CodeNodeProps> = ({ node, isSelected, onClick }) => {
     if (material instanceof THREE.MeshPhongMaterial) {
       if (isSelected) {
         material.emissive.setHex(0xffffff);
-        material.emissiveIntensity = 0.3;
+        material.emissiveIntensity = 0.6; // 선택시 더 밝게
       } else if (hovered) {
-        material.emissive.setHex(0x666666);
-        material.emissiveIntensity = 0.2;
+        material.emissive.setHex(0x888888);
+        material.emissiveIntensity = 0.4; // 호버시 더 밝게
       } else {
         material.emissive.set(node.emissive);
-        material.emissiveIntensity = 0.1;
+        material.emissiveIntensity = 0.3; // 기본 발광도 증가
       }
     }
   });
@@ -95,12 +96,14 @@ const CodeNode: React.FC<CodeNodeProps> = ({ node, isSelected, onClick }) => {
   const handlePointerOver = (event: any) => {
     event.stopPropagation();
     setHovered(true);
+    setShowTooltip(true);
     document.body.style.cursor = 'pointer';
   };
   
   const handlePointerOut = (event: any) => {
     event.stopPropagation();
     setHovered(false);
+    setShowTooltip(false);
     document.body.style.cursor = 'default';
   };
   
@@ -122,13 +125,49 @@ const CodeNode: React.FC<CodeNodeProps> = ({ node, isSelected, onClick }) => {
       <div className={labelClass}>
         {node.name}
         {node.callCount > 0 && (
-          <span className="ml-1 text-xs opacity-75">
+          <span className="ml-2 text-xl font-bold opacity-100">
             ({node.callCount})
           </span>
         )}
       </div>
     );
   };
+
+  // Tooltip component
+  const NodeTooltip = () => (
+    <div className="node-tooltip">
+      <div className="tooltip-header">
+        <span className="font-bold text-lg">{node.name}</span>
+        <span className="text-sm opacity-75 ml-2">({node.type})</span>
+      </div>
+      <div className="tooltip-content">
+        <div className="tooltip-row">
+          <span className="tooltip-label">모듈:</span>
+          <span className="tooltip-value">{node.file || 'unknown'}</span>
+        </div>
+        <div className="tooltip-row">
+          <span className="tooltip-label">호출 횟수:</span>
+          <span className="tooltip-value">{node.callCount || 0}</span>
+        </div>
+        <div className="tooltip-row">
+          <span className="tooltip-label">코드 길이:</span>
+          <span className="tooltip-value">{node.lineCount || 'N/A'} lines</span>
+        </div>
+        {node.dead && (
+          <div className="tooltip-row text-red-400">
+            <span className="tooltip-label">상태:</span>
+            <span className="tooltip-value">Dead Code</span>
+          </div>
+        )}
+        {(node.callCount || 0) > 5 && (
+          <div className="tooltip-row text-yellow-400">
+            <span className="tooltip-label">상태:</span>
+            <span className="tooltip-value">High Usage</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
   
   return (
     <group position={node.position}>
@@ -146,13 +185,25 @@ const CodeNode: React.FC<CodeNodeProps> = ({ node, isSelected, onClick }) => {
       
       {/* Node label */}
       <Html
-        position={[0, (node.scale || 1) * 2.5, 0]}
+        position={[0, (node.scale || 1) * 3.5, 0]} 
         center
-        distanceFactor={15}
+        distanceFactor={12} 
         occlude
       >
         <NodeLabel />
       </Html>
+
+      {/* Tooltip */}
+      {showTooltip && (
+        <Html
+          position={[0, (node.scale || 1) * 5, 0]}
+          center
+          distanceFactor={8}
+          sprite
+        >
+          <NodeTooltip />
+        </Html>
+      )}
       
       {/* Selection indicator */}
       {isSelected && (
