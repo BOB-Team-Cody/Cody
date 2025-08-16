@@ -128,7 +128,7 @@ async def root():
             "GET /functions/search/{function_name}": "Search functions by name",
             "GET /functions/id/{function_id}": "Get function by ID",
             "GET /functions/file/{file_path}": "Get functions by file",
-            "POST /refactor/{function_id}": "Refactor function with LangGraph agent",
+            "GET /refactor/{function_id}": "Refactor function with LangGraph agent",
             "GET /docs": "API documentation"
         }
     }
@@ -241,13 +241,13 @@ async def get_functions_by_file(
     return await controller.search_functions_by_file(file_path)
 
 
-@app.post("/refactor/{function_id}")
+@app.get("/refactor")
 async def refactor_function(function_id: str):
     """
     Refactor a function using LangGraph-based agent.
     
     Args:
-        function_id: The function ID to refactor
+        function_id: The function ID to refactor (as query parameter)
         
     Returns:
         Streaming response with refactoring progress and results
@@ -282,10 +282,12 @@ async def refactor_function(function_id: str):
     
     return StreamingResponse(
         generate_refactoring_stream(),
-        media_type="text/plain",
+        media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Headers": "Cache-Control",
         }
     )
 

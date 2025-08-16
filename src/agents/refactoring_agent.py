@@ -71,7 +71,7 @@ class CodeRefactoringAgent:
     
     def _build_workflow(self) -> StateGraph:
         """Build the LangGraph workflow for code refactoring."""
-        workflow = StateGraph(RefactoringState)
+        workflow = StateGraph(Dict[str, Any])
         
         # Add nodes
         workflow.add_node("analyze_code", self._analyze_code_node)
@@ -88,18 +88,18 @@ class CodeRefactoringAgent:
         
         return workflow.compile(checkpointer=self.checkpointer)
     
-    async def _analyze_code_node(self, state: RefactoringState) -> RefactoringState:
+    async def _analyze_code_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Analyze the target code and its context."""
-        logger.info(f"Analyzing code for function: {state.function_name}")
+        logger.info(f"Analyzing code for function: {state['function_name']}")
         
-        state.current_step = "analyze_code"
+        state["current_step"] = "analyze_code"
         
         # Create analysis prompt
         context_info = ""
-        if state.context_functions:
+        if state["context_functions"]:
             context_info = "\n".join([
                 f"- {func['name']} (calls: {func.get('callCount', 0)}, dead: {func.get('dead', False)})"
-                for func in state.context_functions[:10]  # Limit context
+                for func in state["context_functions"][:10]  # Limit context
             ])
         
         analysis_prompt = ChatPromptTemplate.from_messages([
@@ -134,9 +134,9 @@ Please provide a comprehensive analysis of this function, highlighting specific 
         
         try:
             messages = analysis_prompt.format_messages(
-                function_name=state.function_name,
-                file_path=state.file_path,
-                source_code=state.source_code,
+                function_name=state["function_name"],
+                file_path=state["file_path"],
+                source_code=state["source_code"],
                 context_info=context_info or "No related functions found."
             )
             
@@ -144,7 +144,7 @@ Please provide a comprehensive analysis of this function, highlighting specific 
             analysis_content = response.content
             
             # Store the LLM response
-            state.llm_responses.append(analysis_content)
+            state["llm_responses"].append(analysis_content)
             
             # Try to extract structured data for internal use
             try:
@@ -168,21 +168,21 @@ Please provide a comprehensive analysis of this function, highlighting specific 
                     "issues": []
                 }
             
-            state.analysis_result = analysis_result
+            state["analysis_result"] = analysis_result
             
         except Exception as e:
             logger.error(f"Error in code analysis: {e}")
             error_message = f"Error during code analysis: {str(e)}"
-            state.analysis_result = {"error": error_message}
-            state.llm_responses.append(error_message)
+            state["analysis_result"] = {"error": error_message}
+            state["llm_responses"].append(error_message)
         
         return state
     
-    async def _generate_suggestions_node(self, state: RefactoringState) -> RefactoringState:
+    async def _generate_suggestions_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Generate refactoring suggestions based on analysis."""
-        logger.info(f"Generating refactoring suggestions for: {state.function_name}")
+        logger.info(f"Generating refactoring suggestions for: {state['function_name']}")
         
-        state.current_step = "generate_suggestions"
+        state["current_step"] = "generate_suggestions"
         
         suggestions_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are an expert code refactoring consultant.
@@ -210,19 +210,19 @@ Generate specific refactoring suggestions with detailed explanations for each im
         ])
         
         try:
-            analysis_text = str(state.analysis_result) if state.analysis_result else "No analysis available"
+            analysis_text = str(state["analysis_result"]) if state["analysis_result"] else "No analysis available"
             
             messages = suggestions_prompt.format_messages(
-                function_name=state.function_name,
+                function_name=state["function_name"],
                 analysis_result=analysis_text,
-                source_code=state.source_code
+                source_code=state["source_code"]
             )
             
             response = await self.llm.ainvoke(messages)
             suggestions_content = response.content
             
             # Store the LLM response
-            state.llm_responses.append(suggestions_content)
+            state["llm_responses"].append(suggestions_content)
             
             # Try to extract structured suggestions for internal use
             try:
@@ -254,21 +254,21 @@ Generate specific refactoring suggestions with detailed explanations for each im
                     "benefits": "Improved code quality"
                 }]
             
-            state.refactoring_suggestions = suggestions
+            state["refactoring_suggestions"] = suggestions
             
         except Exception as e:
             logger.error(f"Error generating suggestions: {e}")
             error_message = f"Error generating refactoring suggestions: {str(e)}"
-            state.refactoring_suggestions = []
-            state.llm_responses.append(error_message)
+            state["refactoring_suggestions"] = []
+            state["llm_responses"].append(error_message)
         
         return state
     
-    async def _refactor_code_node(self, state: RefactoringState) -> RefactoringState:
+    async def _refactor_code_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Apply refactoring suggestions to generate improved code."""
-        logger.info(f"Refactoring code for: {state.function_name}")
+        logger.info(f"Refactoring code for: {state['function_name']}")
         
-        state.current_step = "refactor_code"
+        state["current_step"] = "refactor_code"
         
         refactoring_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are an expert Python developer performing code refactoring.
@@ -297,14 +297,14 @@ Please explain your refactoring approach and then provide the complete improved 
         
         try:
             suggestions_text = ""
-            if state.refactoring_suggestions:
-                for i, suggestion in enumerate(state.refactoring_suggestions, 1):
+            if state["refactoring_suggestions"]:
+                for i, suggestion in enumerate(state["refactoring_suggestions"], 1):
                     suggestions_text += f"{i}. {suggestion.get('type', 'Unknown')}: {suggestion.get('description', 'No description')}\n"
             else:
                 suggestions_text = "No specific suggestions available. Apply general best practices."
             
             messages = refactoring_prompt.format_messages(
-                source_code=state.source_code,
+                source_code=state["source_code"],
                 suggestions=suggestions_text
             )
             
@@ -312,7 +312,7 @@ Please explain your refactoring approach and then provide the complete improved 
             refactoring_content = response.content
             
             # Store the LLM response
-            state.llm_responses.append(refactoring_content)
+            state["llm_responses"].append(refactoring_content)
             
             # Extract code from response (remove markdown formatting if present)
             refactored_code = refactoring_content
@@ -325,21 +325,21 @@ Please explain your refactoring approach and then provide the complete improved 
                 if len(code_blocks) >= 3:
                     refactored_code = code_blocks[1].strip()
             
-            state.refactored_code = refactored_code
+            state["refactored_code"] = refactored_code
             
         except Exception as e:
             logger.error(f"Error refactoring code: {e}")
             error_message = f"Error during code refactoring: {str(e)}"
-            state.refactored_code = state.source_code  # Fallback to original
-            state.llm_responses.append(error_message)
+            state["refactored_code"] = state["source_code"]  # Fallback to original
+            state["llm_responses"].append(error_message)
         
         return state
     
-    async def _validate_refactoring_node(self, state: RefactoringState) -> RefactoringState:
+    async def _validate_refactoring_node(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """Validate the refactored code and provide final assessment."""
-        logger.info(f"Validating refactored code for: {state.function_name}")
+        logger.info(f"Validating refactored code for: {state['function_name']}")
         
-        state.current_step = "validate_refactoring"
+        state["current_step"] = "validate_refactoring"
         
         validation_prompt = ChatPromptTemplate.from_messages([
             ("system", """You are a code quality validator.
@@ -370,15 +370,15 @@ Please provide a comprehensive validation assessment of the refactoring quality 
         
         try:
             messages = validation_prompt.format_messages(
-                original_code=state.source_code,
-                refactored_code=state.refactored_code or "No refactored code available"
+                original_code=state["source_code"],
+                refactored_code=state["refactored_code"] or "No refactored code available"
             )
             
             response = await self.llm.ainvoke(messages)
             validation_content = response.content
             
             # Store the LLM response
-            state.llm_responses.append(validation_content)
+            state["llm_responses"].append(validation_content)
             
             # Try to extract structured validation for internal use
             try:
@@ -400,13 +400,13 @@ Please provide a comprehensive validation assessment of the refactoring quality 
                     "quality_score": 8
                 }
             
-            state.validation_result = validation_result
+            state["validation_result"] = validation_result
             
         except Exception as e:
             logger.error(f"Error validating refactoring: {e}")
             error_message = f"Error during validation: {str(e)}"
-            state.validation_result = {"error": error_message}
-            state.llm_responses.append(error_message)
+            state["validation_result"] = {"error": error_message}
+            state["llm_responses"].append(error_message)
         
         return state
     
@@ -436,13 +436,19 @@ Please provide a comprehensive validation assessment of the refactoring quality 
             )
             
             # Initialize state
-            initial_state = RefactoringState(
-                function_id=function_id,
-                source_code=function_data["sourceCode"] or "",
-                function_name=function_data["name"],
-                file_path=function_data["file"],
-                context_functions=context_functions
-            )
+            initial_state = {
+                "function_id": function_id,
+                "source_code": function_data["sourceCode"] or "",
+                "function_name": function_data["name"],
+                "file_path": function_data["file"],
+                "context_functions": context_functions,
+                "analysis_result": None,
+                "refactoring_suggestions": None,
+                "refactored_code": None,
+                "validation_result": None,
+                "current_step": "",
+                "llm_responses": []
+            }
             
             # Configure workflow
             config = {
@@ -457,19 +463,19 @@ Please provide a comprehensive validation assessment of the refactoring quality 
                 for node_name, node_state in chunk.items():
                     if node_name != "__end__":
                         # Check for new LLM responses
-                        if (hasattr(node_state, 'llm_responses') and 
-                            len(node_state.llm_responses) > previous_response_count):
+                        if ("llm_responses" in node_state and 
+                            len(node_state["llm_responses"]) > previous_response_count):
                             
                             # Yield new LLM responses
-                            for i in range(previous_response_count, len(node_state.llm_responses)):
+                            for i in range(previous_response_count, len(node_state["llm_responses"])):
                                 yield {
-                                    "step": node_state.current_step,
-                                    "content": node_state.llm_responses[i],
+                                    "step": node_state["current_step"],
+                                    "content": node_state["llm_responses"][i],
                                     "node": node_name,
                                     "type": "llm_response"
                                 }
                             
-                            previous_response_count = len(node_state.llm_responses)
+                            previous_response_count = len(node_state["llm_responses"])
                         
                         # Yield specific results when workflow completes
                         if node_name == "validate_refactoring":
@@ -477,14 +483,14 @@ Please provide a comprehensive validation assessment of the refactoring quality 
                                 "step": "workflow_complete",
                                 "type": "final_result",
                                 "result": {
-                                    "function_name": node_state.function_name,
-                                    "file_path": node_state.file_path,
-                                    "original_code": node_state.source_code,
-                                    "refactored_code": node_state.refactored_code,
-                                    "suggestions": node_state.refactoring_suggestions,
-                                    "analysis": node_state.analysis_result,
-                                    "validation": node_state.validation_result,
-                                    "llm_responses": node_state.llm_responses
+                                    "function_name": node_state["function_name"],
+                                    "file_path": node_state["file_path"],
+                                    "original_code": node_state["source_code"],
+                                    "refactored_code": node_state["refactored_code"],
+                                    "suggestions": node_state["refactoring_suggestions"],
+                                    "analysis": node_state["analysis_result"],
+                                    "validation": node_state["validation_result"],
+                                    "llm_responses": node_state["llm_responses"]
                                 }
                             }
             
