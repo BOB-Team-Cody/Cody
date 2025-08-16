@@ -166,7 +166,8 @@ class AnalysisService:
             file=str(rel_path),
             label=rel_path.stem,
             dead=False,
-            call_count=0
+            call_count=0,
+            class_name=None  # Modules don't belong to classes
         )]
         
         # Analyze AST nodes
@@ -201,6 +202,7 @@ class ASTAnalyzer(ast.NodeVisitor):
         self.nodes: List[CodeNode] = []
         self.edges: List[CodeEdge] = []
         self.current_scope: List[str] = []
+        self.current_class_stack: List[str] = []  # Track current class names
         self.imports: Dict[str, str] = {}  # symbol_name -> actual_module_path
         self.symbol_definitions: Dict[str, str] = {}  # symbol_name -> definition_location
     
@@ -239,13 +241,17 @@ class ASTAnalyzer(ast.NodeVisitor):
         is_dead = func_id in self.dead_code_items
         call_count = self.call_counts.get(func_name, 0)
         
+        # Determine class name (if function is inside a class)
+        class_name = self.current_class_stack[-1] if self.current_class_stack else None
+        
         func_node = CodeNode(
             id=func_id,
             type="function",
             file=self.file_path,
             label=func_name,
             dead=is_dead,
-            call_count=call_count
+            call_count=call_count,
+            class_name=class_name
         )
         self.nodes.append(func_node)
         
@@ -275,12 +281,14 @@ class ASTAnalyzer(ast.NodeVisitor):
             file=self.file_path,
             label=class_name,
             dead=is_dead,
-            call_count=call_count
+            call_count=call_count,
+            class_name=None  # Classes don't have a parent class name in this context
         )
         self.nodes.append(class_node)
         
         # Enter class scope
         self.current_scope.append(class_name)
+        self.current_class_stack.append(class_name)  # Track class for nested functions
         
         # Visit class body
         for stmt in node.body:
@@ -288,6 +296,7 @@ class ASTAnalyzer(ast.NodeVisitor):
         
         # Exit class scope
         self.current_scope.pop()
+        self.current_class_stack.pop()
     
     def visit_Call(self, node: ast.Call) -> None:
         """Visit function calls."""
@@ -329,17 +338,44 @@ class ASTAnalyzer(ast.NodeVisitor):
                 # It's a module import, keep as current file
                 return f"{self.file_path}:{func_name}"
         
-        # Check if it's a builtin function
-        builtins = {
-            'print', 'len', 'str', 'int', 'float', 'bool', 'list', 'dict', 'set', 'tuple',
-            'range', 'enumerate', 'zip', 'map', 'filter', 'sum', 'max', 'min', 'abs',
-            'round', 'sorted', 'reversed', 'all', 'any', 'hasattr', 'getattr', 'setattr',
-            'isinstance', 'issubclass', 'type', 'open', 'input', 'hash', 'id', 'repr'
-        }
-        
-        if func_name in builtins:
+        # Check if it's a builtin function using Python's builtins module
+        if self._is_builtin_function(func_name):
             return f"builtins:{func_name}"
         
         # Default: assume it's in the same file
         return f"{self.file_path}:{func_name}"
+    
+    def _is_builtin_function(self, func_name: str) -> bool:
+        """Check if function is a Python builtin function or common method."""
+        import builtins
+        import types
+        
+        # 1. Check if it's in Python's builtins module
+        if hasattr(builtins, func_name):
+            builtin_obj = getattr(builtins, func_name)
+            return callable(builtin_obj)
+        
+        # 2. Dynamically get all builtin types from builtins module
+        builtin_types = []
+        for name in dir(builtins):
+            obj = getattr(builtins, name)
+            # Check if it's a type (class) and not a function/exception
+            if isinstance(obj, type) and not issubclass(obj, BaseException):
+                builtin_types.append(obj)
+        
+        # Check if it's a method available on any builtin type
+        for builtin_type in builtin_types:
+            if hasattr(builtin_type, func_name):
+                attr = getattr(builtin_type, func_name)
+                # Check if it's a method (callable and not a property/descriptor)
+                if callable(attr):
+                    return True
+        
+        # 3. Check object base class methods (inherited by all objects)
+        if hasattr(object, func_name):
+            attr = getattr(object, func_name)
+            if callable(attr):
+                return True
+        
+        return False
     
