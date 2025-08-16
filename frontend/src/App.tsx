@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useApiStatus } from '@/hooks/useApi';
 import Sidebar from '@/components/Sidebar';
+import RefactoringSidebar from '@/components/RefactoringSidebar';
 import Scene3D from '@/components/Scene3D';
 import LoadingScreen from '@/components/LoadingScreen';
 import ToastContainer from '@/components/ToastContainer';

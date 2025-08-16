@@ -79,7 +79,7 @@ export interface AppState {
   
   // UI state
   sidebarOpen: boolean;
-  activeTab: 'analysis' | 'hierarchy' | 'code' | 'stats'; // Added 'hierarchy' tab
+  activeTab: 'analysis' | 'hierarchy' | 'code' | 'stats' | 'refactor';
   selectedNode: NodeData | null;
   
   // 3D state
@@ -91,6 +91,16 @@ export interface AppState {
   // Connection state
   apiConnected: boolean;
   lastError: string | null;
+
+  // Refactoring state
+  comparisonData: any;
+  showComparison: boolean;
+  currentProjectPath: string;
+  toasts: Array<{
+    id: number;
+    message: string;
+    type: 'success' | 'error' | 'warning' | 'info';
+  }>;
 }
 
 // Component Props Types

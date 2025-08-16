@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Search, BarChart3, FileText, GitBranch } from 'lucide-react';
+import { Search, BarChart3, FileText, GitBranch, Wrench } from 'lucide-react';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useAnalysisWorkflow } from '@/hooks/useApi';
 import AnalysisPanel from './Sidebar/AnalysisPanel';
 import StatisticsPanel from './Sidebar/StatisticsPanel';
 import CodePanel from './Sidebar/CodePanel';
 import HierarchyPanel from './Sidebar/HierarchyPanel';
+import RefactorPanel from './Sidebar/RefactorPanel';
 
 const Sidebar: React.FC = () => {
   const {
@@ -16,6 +17,7 @@ const Sidebar: React.FC = () => {
     isAnalyzing,
     analysisResult,
     statistics,
+    setCurrentProjectPath,
   } = useAppStore();
   
   const { runAnalysis } = useAnalysisWorkflow();
@@ -27,6 +29,8 @@ const Sidebar: React.FC = () => {
     }
     
     try {
+      // Set the current project path for refactoring
+      setCurrentProjectPath(projectPath.trim());
       await runAnalysis(projectPath.trim());
     } catch (error) {
       console.error('Analysis failed:', error);
@@ -37,6 +41,7 @@ const Sidebar: React.FC = () => {
     { id: 'analysis' as const, label: '분석 결과', icon: Search },
     { id: 'hierarchy' as const, label: '계층 뷰', icon: GitBranch },
     { id: 'stats' as const, label: '통계', icon: BarChart3 },
+    { id: 'refactor' as const, label: '리팩토링', icon: Wrench },
     { id: 'code' as const, label: '코드', icon: FileText },
   ];
   
@@ -144,6 +149,10 @@ const Sidebar: React.FC = () => {
             statistics={statistics}
             analysisResult={analysisResult}
           />
+        )}
+        
+        {activeTab === 'refactor' && (
+          <RefactorPanel />
         )}
         
         {activeTab === 'code' && (

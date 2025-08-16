@@ -112,6 +112,82 @@ class CodeWeaverAPI {
   }
 
   /**
+   * Refactor a project using AI-powered suggestions
+   */
+  async refactorProject(request: {
+    path: string;
+    suggestions_only?: boolean;
+    apply_suggestions?: boolean;
+  }): Promise<{
+    success: boolean;
+    message: string;
+    suggestions_count: number;
+    suggestions: any[];
+    original_stats: any;
+    refactored_stats: any;
+  }> {
+    const response = await this.api.post('/refactor', request);
+    return response.data;
+  }
+
+  /**
+   * Get comparison visualization data
+   */
+  async getComparisonVisualization(projectPath: string): Promise<{
+    original: any;
+    refactored: any;
+    differences: any;
+  }> {
+    const response = await this.api.get(`/compare-visualization?path=${encodeURIComponent(projectPath)}`);
+    return response.data;
+  }
+
+  /**
+   * Apply selected refactoring suggestions
+   */
+  async applySuggestions(projectPath: string, suggestionIds: string[]): Promise<{
+    success: boolean;
+    message: string;
+    applied_suggestions: string[];
+    modified_files: string[];
+  }> {
+    const response = await this.api.post('/apply-suggestions', {
+      project_path: projectPath,
+      suggestion_ids: suggestionIds
+    });
+    return response.data;
+  }
+
+  /**
+   * Get refactoring session information
+   */
+  async getRefactorSession(sessionId: string): Promise<{
+    id: string;
+    project_path: string;
+    status: string;
+    start_time: string;
+    end_time?: string;
+    current_step: string;
+    progress_percentage: number;
+    messages: string[];
+  }> {
+    const response = await this.api.get(`/refactor/session/${sessionId}`);
+    return response.data;
+  }
+
+  /**
+   * Get session messages
+   */
+  async getSessionMessages(sessionId: string, since: number = 0): Promise<{
+    session_id: string;
+    messages: string[];
+    total_count: number;
+  }> {
+    const response = await this.api.get(`/refactor/session/${sessionId}/messages?since=${since}`);
+    return response.data;
+  }
+
+  /**
    * Get API information
    */
   async getApiInfo(): Promise<any> {
@@ -150,6 +226,9 @@ class CodeWeaverAPI {
 
 // Create singleton instance
 export const apiClient = new CodeWeaverAPI();
+
+// Export default instance as 'api' for convenience
+export const api = apiClient;
 
 // Export class for testing or custom instances
 export { CodeWeaverAPI };

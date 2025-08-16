@@ -13,10 +13,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 
-from src.models.api_models import AnalyzeRequest, AnalyzeResponse, GraphDataResponse
+from src.models.api_models import AnalyzeRequest, AnalyzeResponse, GraphDataResponse, RefactorRequest, RefactorResponse, CompareVisualizationResponse
 from src.services.analysis_service import AnalysisService
 from src.services.database_service import DatabaseService
 from src.controllers.analysis_controller import AnalysisController
+from src.controllers.refactor_controller import RefactorController
+from src.services.message_service import message_service
 from src.utils.logging_utils import setup_logger
 
 # Load environment variables
@@ -29,12 +31,13 @@ logger = setup_logger(__name__)
 analysis_service: AnalysisService = None
 database_service: DatabaseService = None
 analysis_controller: AnalysisController = None
+refactor_controller: RefactorController = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management."""
-    global analysis_service, database_service, analysis_controller
+    global analysis_service, database_service, analysis_controller, refactor_controller
     
     # Startup
     logger.info("Starting Code Weaver API...")
@@ -49,8 +52,9 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("Connected to Neo4j database successfully")
     
-    # Initialize controller
+    # Initialize controllers
     analysis_controller = AnalysisController(analysis_service, database_service)
+    refactor_controller = RefactorController(analysis_service, database_service)
     
     logger.info("Code Weaver API started successfully")
     
@@ -99,6 +103,16 @@ def get_analysis_controller() -> AnalysisController:
     return analysis_controller
 
 
+def get_refactor_controller() -> RefactorController:
+    """Dependency injection for refactor controller."""
+    if refactor_controller is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Refactor service not initialized"
+        )
+    return refactor_controller
+
+
 # API Routes
 @app.get("/")
 async def root():
@@ -114,6 +128,11 @@ async def root():
             "GET /statistics": "Get analysis statistics",
             "GET /health": "Health check",
             "DELETE /clear": "Clear analysis data",
+            "POST /refactor": "Generate refactoring suggestions",
+            "GET /compare-visualization": "Get comparison visualization data", 
+            "POST /apply-suggestions": "Apply refactoring suggestions",
+            "GET /refactor/session/{id}": "Get refactoring session info",
+            "GET /refactor/session/{id}/messages": "Get session messages",
             "GET /docs": "API documentation"
         }
     }
@@ -173,6 +192,111 @@ async def clear_data(controller: AnalysisController = Depends(get_analysis_contr
         Success status
     """
     return await controller.clear_database()
+
+
+@app.post("/refactor", response_model=RefactorResponse)
+async def refactor_project(
+    request: RefactorRequest,
+    controller: RefactorController = Depends(get_refactor_controller)
+):
+    """
+    Refactor a project using AI-powered suggestions.
+    
+    Args:
+        request: Refactoring request containing project path and options
+        
+    Returns:
+        Refactoring suggestions and analysis
+    """
+    return await controller.refactor_project(request)
+
+
+@app.get("/compare-visualization", response_model=CompareVisualizationResponse)
+async def get_comparison_visualization(
+    path: str,
+    controller: RefactorController = Depends(get_refactor_controller)
+):
+    """
+    Get comparison visualization data for original vs refactored code.
+    
+    Args:
+        path: Project path to analyze
+        
+    Returns:
+        Comparison visualization data
+    """
+    return await controller.get_comparison_visualization(path)
+
+
+@app.post("/apply-suggestions")
+async def apply_suggestions(
+    request: dict,
+    controller: RefactorController = Depends(get_refactor_controller)
+):
+    """
+    Apply selected refactoring suggestions to the project.
+    
+    Args:
+        request: Dictionary containing project_path and suggestion_ids
+        
+    Returns:
+        Result of applying suggestions
+    """
+    project_path = request.get("project_path")
+    suggestion_ids = request.get("suggestion_ids", [])
+    
+    if not project_path:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="project_path is required"
+        )
+    
+    return await controller.apply_suggestions(project_path, suggestion_ids)
+
+
+@app.get("/refactor/session/{session_id}")
+async def get_refactor_session(session_id: str):
+    """
+    Get refactoring session information.
+    
+    Args:
+        session_id: Session ID
+        
+    Returns:
+        Session information with progress and messages
+    """
+    session = message_service.get_session(session_id)
+    if not session:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Session {session_id} not found"
+        )
+    
+    return session.to_dict()
+
+
+@app.get("/refactor/session/{session_id}/messages")
+async def get_session_messages(session_id: str, since: int = 0):
+    """
+    Get messages for a refactoring session.
+    
+    Args:
+        session_id: Session ID
+        since: Get messages since this index (for polling)
+        
+    Returns:
+        List of messages
+    """
+    if since == 0:
+        messages = message_service.get_session_messages(session_id)
+    else:
+        messages = message_service.get_latest_messages(session_id, since)
+    
+    return {
+        "session_id": session_id,
+        "messages": messages,
+        "total_count": len(message_service.get_session_messages(session_id))
+    }
 
 
 @app.get("/frontend")

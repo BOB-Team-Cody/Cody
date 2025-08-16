@@ -12,7 +12,7 @@ interface AppActions {
   // UI actions
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
-  setActiveTab: (tab: 'analysis' | 'hierarchy' | 'code' | 'stats') => void;
+  setActiveTab: (tab: 'analysis' | 'hierarchy' | 'code' | 'stats' | 'refactor') => void;
   setSelectedNode: (node: NodeData | null) => void;
   
   // 3D actions
@@ -26,6 +26,12 @@ interface AppActions {
   // Connection actions
   setApiConnected: (connected: boolean) => void;
   setLastError: (error: string | null) => void;
+
+  // Refactoring actions
+  setComparisonData: (data: any) => void;
+  setShowComparison: (show: boolean) => void;
+  setCurrentProjectPath: (path: string) => void;
+  addToast: (message: string, type: 'success' | 'error' | 'warning' | 'info') => void;
   
   // Reset actions
   resetAnalysisState: () => void;
@@ -56,6 +62,12 @@ const initialState: AppState = {
   // Connection state
   apiConnected: false,
   lastError: null,
+
+  // Refactoring state
+  comparisonData: null,
+  showComparison: false,
+  currentProjectPath: '',
+  toasts: [],
 };
 
 export const useAppStore = create<AppStore>()(
@@ -122,6 +134,21 @@ export const useAppStore = create<AppStore>()(
       
       setLastError: (lastError) =>
         set({ lastError }, false, 'setLastError'),
+
+      // Refactoring actions
+      setComparisonData: (comparisonData) =>
+        set({ comparisonData }, false, 'setComparisonData'),
+
+      setShowComparison: (showComparison) =>
+        set({ showComparison }, false, 'setShowComparison'),
+
+      setCurrentProjectPath: (currentProjectPath) =>
+        set({ currentProjectPath }, false, 'setCurrentProjectPath'),
+
+      addToast: (message, type) =>
+        set((state) => ({
+          toasts: [...state.toasts, { id: Date.now(), message, type }]
+        }), false, 'addToast'),
       
       // Reset actions
       resetAnalysisState: () =>

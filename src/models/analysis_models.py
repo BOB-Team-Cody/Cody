@@ -95,3 +95,99 @@ class AnalysisResult:
                 for node in most_called
             ]
         }
+
+
+@dataclass
+class RefactorSuggestion:
+    """Represents a refactoring suggestion."""
+    id: str
+    type: str  # 'extract_method', 'rename', 'remove_dead_code', 'simplify', etc.
+    target_file: str
+    target_element: str
+    description: str
+    original_code: str
+    suggested_code: str
+    confidence: float
+    reasoning: str
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "type": self.type,
+            "target_file": self.target_file,
+            "target_element": self.target_element,
+            "description": self.description,
+            "original_code": self.original_code,
+            "suggested_code": self.suggested_code,
+            "confidence": self.confidence,
+            "reasoning": self.reasoning
+        }
+
+
+@dataclass
+class RefactorResult:
+    """Complete refactoring result."""
+    suggestions: List[RefactorSuggestion]
+    original_analysis: AnalysisResult
+    refactored_analysis: Optional[AnalysisResult] = None
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "suggestions": [suggestion.to_dict() for suggestion in self.suggestions],
+            "original_analysis": self.original_analysis.to_dict(),
+            "refactored_analysis": self.refactored_analysis.to_dict() if self.refactored_analysis else None
+        }
+
+
+@dataclass
+class RefactoringSession:
+    """Represents a refactoring session with progress tracking."""
+    id: str
+    project_path: str
+    status: str  # 'running', 'completed', 'failed'
+    start_time: str
+    end_time: Optional[str] = None
+    current_step: str = ""
+    progress_percentage: int = 0
+    messages: List[str] = None
+    
+    def __post_init__(self):
+        if self.messages is None:
+            self.messages = []
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "project_path": self.project_path,
+            "status": self.status,
+            "start_time": self.start_time,
+            "end_time": self.end_time,
+            "current_step": self.current_step,
+            "progress_percentage": self.progress_percentage,
+            "messages": self.messages
+        }
+
+
+@dataclass
+class SourceCodeSnapshot:
+    """Represents a snapshot of source code for version tracking."""
+    id: str
+    file_path: str
+    content: str
+    hash: str
+    timestamp: str
+    version: str = "original"
+    
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for JSON serialization."""
+        return {
+            "id": self.id,
+            "file_path": self.file_path,
+            "content": self.content,
+            "hash": self.hash,
+            "timestamp": self.timestamp,
+            "version": self.version
+        }
