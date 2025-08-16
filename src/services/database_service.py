@@ -175,7 +175,8 @@ class DatabaseService:
                 n.dead = $dead,
                 n.type = $type,
                 n.callCount = $callCount,
-                n.sourceCode = $sourceCode
+                n.sourceCode = $sourceCode,
+                n.className = $className
             """
         elif node_type == "Class":
             query = """
@@ -185,6 +186,7 @@ class DatabaseService:
                 n.dead = $dead,
                 n.type = $type,
                 n.callCount = $callCount,
+                 n.className = $className,
                 n.sourceCode = $sourceCode
             """
         elif node_type == "Module":
@@ -195,6 +197,7 @@ class DatabaseService:
                 n.dead = $dead,
                 n.type = $type,
                 n.callCount = $callCount,
+                n.className = $className,
                 n.sourceCode = $sourceCode
             """
         else:
@@ -205,6 +208,7 @@ class DatabaseService:
                 n.dead = $dead,
                 n.type = $type,
                 n.callCount = $callCount,
+                n.className = $className,
                 n.sourceCode = $sourceCode
             """
         
@@ -215,6 +219,7 @@ class DatabaseService:
             "dead": node.dead,
             "type": node.type,
             "callCount": node.call_count,
+            "className": node.class_name,
             "sourceCode": getattr(node, 'source_code', '')
         })
     
