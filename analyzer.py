@@ -9,6 +9,108 @@ from pathlib import Path
 from typing import List, Dict, Any, Set, Tuple
 from vulture import Vulture
 
+class CodeAnalyzer:
+    """Main analyzer for Python projects."""
+    def __init__(self):
+        self.nodes = []
+        self.edges = []
+        self.dead_code_items = set()
+
+    def analyze_project(self, project_path: str) -> Dict[str, List[Dict[str, Any]]]:
+        project_path = Path(project_path)
+        if not project_path.exists():
+            raise ValueError(f"Project path does not exist: {project_path}")
+
+        # Dead code detection
+        self._detect_dead_code(project_path)
+        # AST analysis
+        self._analyze_code_structure(project_path)
+
+        return {
+            "nodes": self.nodes,
+            "edges": self.edges
+        }
+
+    def _detect_dead_code(self, project_path: Path) -> None:
+        """Detect dead code using vulture."""
+        vulture = Vulture()
+        python_files = list(project_path.rglob("*.py"))
+        if not python_files:
+            return
+        vulture.scavenge(python_files)
+        unused_code = vulture.get_unused_code()
+        for item in unused_code:
+            try:
+                rel_path = Path(item.filename).relative_to(project_path)
+            except ValueError:
+                abs_path = Path(item.filename).resolve()
+                abs_project = project_path.resolve()
+                rel_path = abs_path.relative_to(abs_project)
+            if hasattr(item, 'name') and item.name:
+                dead_id = f"{rel_path}:{item.name}"
+                self.dead_code_items.add(dead_id)
+            else:
+                dead_id = f"{rel_path}:line_{item.first_lineno}"
+                self.dead_code_items.add(dead_id)
+
+    def _analyze_code_structure(self, project_path: Path) -> None:
+        python_files = list(project_path.rglob("*.py"))
+        all_call_counts = {}
+        for py_file in python_files:
+            try:
+                analyzer = self._get_file_analyzer(py_file, project_path)
+                if analyzer:
+                    for func_name, count in analyzer.call_counts.items():
+                        all_call_counts[func_name] = all_call_counts.get(func_name, 0) + count
+            except Exception as e:
+                continue
+        for py_file in python_files:
+            try:
+                self._analyze_file(py_file, project_path, all_call_counts)
+            except Exception as e:
+                continue
+
+    def _get_file_analyzer(self, file_path: Path, project_root: Path) -> 'ASTAnalyzer':
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except Exception:
+            return None
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return None
+        rel_path = file_path.relative_to(project_root)
+        analyzer = ASTAnalyzer(str(rel_path), self.dead_code_items)
+        analyzer.visit(tree)
+        return analyzer
+
+    def _analyze_file(self, file_path: Path, project_root: Path, all_call_counts: Dict[str, int]) -> None:
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+        except Exception:
+            return
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return
+        rel_path = file_path.relative_to(project_root)
+        module_id = str(rel_path)
+        self.nodes.append({
+            "id": module_id,
+            "type": "module",
+            "file": str(rel_path),
+            "label": rel_path.stem,
+            "dead": False,
+            "callCount": 0
+        })
+        analyzer = ASTAnalyzer(str(rel_path), self.dead_code_items)
+        analyzer.global_call_counts = all_call_counts
+        analyzer.visit(tree)
+        self.nodes.extend(analyzer.nodes)
+        self.edges.extend(analyzer.edges)
+
 
 def analyze_python_project(project_path: str) -> Dict[str, List[Dict[str, Any]]]:
     """
@@ -142,124 +244,6 @@ def _extract_call_name(node):
     elif isinstance(node, ast.Attribute):
         return node.attr
     return None
-    
-    def _detect_dead_code(self, project_path: Path) -> None:
-        """Detect dead code using vulture."""
-        vulture = Vulture()
-        
-        # Find all Python files
-        python_files = list(project_path.rglob("*.py"))
-        
-        if not python_files:
-            return
-            
-        # Run vulture analysis
-        vulture.scavenge(python_files)
-        
-        # Extract dead code items
-        unused_code = vulture.get_unused_code()
-        print(f"Vulture found {len(unused_code)} unused code items")
-        
-        for item in unused_code:
-            # Create a unique identifier for the dead code item
-            try:
-                rel_path = Path(item.filename).relative_to(project_path)
-            except ValueError:
-                # If relative_to fails, use absolute path and extract relative part
-                abs_path = Path(item.filename).resolve()
-                abs_project = project_path.resolve()
-                rel_path = abs_path.relative_to(abs_project)
-                
-            if hasattr(item, 'name') and item.name:
-                dead_id = f"{rel_path}:{item.name}"
-                self.dead_code_items.add(dead_id)
-                print(f"Dead code detected: {dead_id} (type: {item.typ})")
-            else:
-                # For items without names, use line number
-                dead_id = f"{rel_path}:line_{item.first_lineno}"
-                self.dead_code_items.add(dead_id)
-                print(f"Dead code detected: {dead_id} (type: {item.typ})")
-    
-    def _analyze_code_structure(self, project_path: Path) -> None:
-        """Analyze code structure using AST."""
-        python_files = list(project_path.rglob("*.py"))
-        all_call_counts = {}  # 전체 프로젝트의 호출 횟수 통합
-        
-        # 첫 번째 패스: 모든 파일에서 호출 횟수 수집
-        for py_file in python_files:
-            try:
-                analyzer = self._get_file_analyzer(py_file, project_path)
-                if analyzer:
-                    for func_name, count in analyzer.call_counts.items():
-                        all_call_counts[func_name] = all_call_counts.get(func_name, 0) + count
-            except Exception as e:
-                print(f"Warning: Could not pre-analyze {py_file}: {e}")
-                continue
-        
-        # 두 번째 패스: 실제 분석 수행
-        for py_file in python_files:
-            try:
-                self._analyze_file(py_file, project_path, all_call_counts)
-            except Exception as e:
-                print(f"Warning: Could not analyze {py_file}: {e}")
-                continue
-    
-    def _get_file_analyzer(self, file_path: Path, project_root: Path) -> 'ASTAnalyzer':
-        """Get analyzer for a file (for pre-analysis)."""
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-        except Exception:
-            return None
-            
-        try:
-            tree = ast.parse(content)
-        except SyntaxError:
-            return None
-            
-        rel_path = file_path.relative_to(project_root)
-        analyzer = ASTAnalyzer(str(rel_path), self.dead_code_items)
-        analyzer.visit(tree)
-        return analyzer
-
-    def _analyze_file(self, file_path: Path, project_root: Path, all_call_counts: Dict[str, int]) -> None:
-        """Analyze a single Python file."""
-        try:
-            with open(file_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-        except Exception:
-            return
-            
-        try:
-            tree = ast.parse(content)
-        except SyntaxError:
-            return
-            
-        # Get relative path for consistent IDs
-        rel_path = file_path.relative_to(project_root)
-        
-        # Create module node
-        module_id = str(rel_path)
-        self.nodes.append({
-            "id": module_id,
-            "type": "module",
-            "file": str(rel_path),
-            "label": rel_path.stem,
-            "dead": False,
-            "callCount": 0
-        })
-        
-        # Analyze AST nodes
-        analyzer = ASTAnalyzer(str(rel_path), self.dead_code_items)
-        analyzer.global_call_counts = all_call_counts  # 전역 호출 횟수 전달
-        analyzer.visit(tree)
-        
-        # Add function and class nodes
-        self.nodes.extend(analyzer.nodes)
-        
-        # Add call edges
-        self.edges.extend(analyzer.edges)
-
 
 class ASTAnalyzer(ast.NodeVisitor):
     """AST visitor to extract functions, classes, and call relationships."""
