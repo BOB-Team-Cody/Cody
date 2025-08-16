@@ -90,6 +90,25 @@ async def shutdown_event():
     print("Database connection closed")
 
 
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for Docker container."""
+    try:
+        # Neo4j 연결 확인
+        neo4j_status = "connected" if db.driver else "disconnected"
+        
+        return {
+            "status": "healthy",
+            "neo4j": neo4j_status,
+            "version": "1.0.0"
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Service unhealthy: {str(e)}"
+        )
+
+
 @app.get("/")
 async def root():
     """Root endpoint with API information."""

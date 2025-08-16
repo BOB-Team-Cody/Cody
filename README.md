@@ -1,4 +1,4 @@
-# 🕸️ Code Weaver
+# 🕸️ Cody
 
 **정적 코드 분석과 Dead Code 탐지를 통한 3D 코드 시각화 도구**
 
@@ -21,28 +21,62 @@ Code Weaver는 Python 프로젝트를 분석하여 함수/클래스 간의 호�
 
 ## 🚀 빠른 시작
 
-### 1. 환경 설정
+### 🐳 Docker로 시작하기 (권장)
+
+협업과 배포를 위한 가장 쉬운 방법입니다:
 
 ```bash
 # 프로젝트 클론
 git clone <repository-url>
-cd code-weaver
+cd cody
+
+# Docker로 전체 서비스 실행
+./start-docker.sh  # Linux/Mac
+# 또는
+start-docker.bat   # Windows
+
+# 서비스 중지
+docker-compose down
+```
+
+**접속 주소:**
+- 🌐 Cody API: http://localhost:8000
+- 🗃️ Neo4j Browser: http://localhost:7474 (neo4j/codycody)
+- 📱 Frontend: `frontend.html` 파일을 브라우저에서 열기
+
+### 🔧 로컬 개발 환경
+
+개발을 위한 로컬 설정:
+
+```bash
+# 프로젝트 클론
+git clone <repository-url>
+cd cody
+
+# 가상환경 생성 및 활성화
+python -m venv .cody
+source .cody/bin/activate  # Linux/Mac
+# 또는
+.cody\Scripts\activate     # Windows
 
 # 의존성 설치
-pip install -e .
+pip install -r requirements.txt
 ```
 
 ### 2. Neo4j 설정
 
-Neo4j를 로컬에 설치하거나 Docker로 실행하세요:
+#### Option A: Neo4j Desktop (개발용)
+- Neo4j Desktop 설치 후 데이터베이스 생성
+- 연결 정보: `bolt://localhost:7687`, `neo4j/codycody`
 
+#### Option B: Docker (배포용)
 ```bash
-# Docker로 Neo4j 실행
-docker run \
-    --publish=7474:7474 --publish=7687:7687 \
-    --volume=$HOME/neo4j/data:/data \
-    --env NEO4J_AUTH=neo4j/password \
-    neo4j:latest
+# Neo4j만 Docker로 실행
+docker run -d \
+    --name cody-neo4j \
+    -p 7474:7474 -p 7687:7687 \
+    -e NEO4J_AUTH=neo4j/codycody \
+    neo4j:5.15-community
 ```
 
 ### 3. 서버 실행

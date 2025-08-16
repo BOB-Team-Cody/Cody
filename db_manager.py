@@ -12,9 +12,9 @@ from neo4j.exceptions import ServiceUnavailable, AuthError
 class Neo4jManager:
     """Manages Neo4j database operations for code analysis data."""
     
-    def __init__(self, uri: str = "bolt://localhost:7687", 
-                 username: str = "neo4j", 
-                 password: str = "codycody"):
+    def __init__(self, uri: str = None, 
+                 username: str = None, 
+                 password: str = None):
         """
         Initialize Neo4j connection.
         
@@ -23,9 +23,10 @@ class Neo4jManager:
             username: Database username
             password: Database password
         """
-        self.uri = uri
-        self.username = username
-        self.password = password
+        # 환경 변수에서 값을 가져오거나 기본값 사용
+        self.uri = uri or os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        self.username = username or os.getenv("NEO4J_USERNAME", "neo4j")
+        self.password = password or os.getenv("NEO4J_PASSWORD", "codycody")
         self.driver: Optional[Driver] = None
         
     def connect(self) -> bool:
