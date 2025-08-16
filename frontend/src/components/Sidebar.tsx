@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { Search, BarChart3, FileText } from 'lucide-react';
+import { Search, BarChart3, FileText, GitBranch } from 'lucide-react';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useAnalysisWorkflow } from '@/hooks/useApi';
 import AnalysisPanel from './Sidebar/AnalysisPanel';
 import StatisticsPanel from './Sidebar/StatisticsPanel';
 import CodePanel from './Sidebar/CodePanel';
+import HierarchyPanel from './Sidebar/HierarchyPanel';
 
 const Sidebar: React.FC = () => {
   const {
@@ -34,6 +35,7 @@ const Sidebar: React.FC = () => {
   
   const tabs = [
     { id: 'analysis' as const, label: '분석 결과', icon: Search },
+    { id: 'hierarchy' as const, label: '계층 뷰', icon: GitBranch },
     { id: 'stats' as const, label: '통계', icon: BarChart3 },
     { id: 'code' as const, label: '코드', icon: FileText },
   ];
@@ -77,7 +79,7 @@ const Sidebar: React.FC = () => {
           <button
             onClick={handleAnalyze}
             disabled={isAnalyzing || !projectPath.trim()}
-            className="w-full btn-primary text-sm py-2"
+            className="w-full btn-primary text-sm py-2 flex items-center justify-center"
           >
             {isAnalyzing ? (
               <>
@@ -123,6 +125,14 @@ const Sidebar: React.FC = () => {
       <div className="flex-1 overflow-hidden">
         {activeTab === 'analysis' && (
           <AnalysisPanel
+            analysisResult={analysisResult}
+            selectedNode={selectedNode}
+            isAnalyzing={isAnalyzing}
+          />
+        )}
+        
+        {activeTab === 'hierarchy' && (
+          <HierarchyPanel
             analysisResult={analysisResult}
             selectedNode={selectedNode}
             isAnalyzing={isAnalyzing}
