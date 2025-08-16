@@ -25,6 +25,8 @@ export interface NodeData {
   callCount: number;
   size: number;
   lineCount?: number; // Added for code length information
+  sourceCode?: string; // Added for actual source code from Neo4j
+  className?: string; // Added for class name
 }
 
 export interface LinkData {

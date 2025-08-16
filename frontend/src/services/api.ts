@@ -146,6 +146,30 @@ class CodeWeaverAPI {
     this.baseURL = url;
     this.api.defaults.baseURL = url;
   }
+
+  /**
+   * Get function details by ID
+   */
+  async getFunctionById(functionId: string): Promise<any> {
+    const response = await this.api.get(`/functions/id/${encodeURIComponent(functionId)}`);
+    return response.data;
+  }
+
+  /**
+   * Search functions by name
+   */
+  async searchFunctionsByName(functionName: string): Promise<any> {
+    const response = await this.api.get(`/functions/search/${encodeURIComponent(functionName)}`);
+    return response.data;
+  }
+
+  /**
+   * Get functions by file path
+   */
+  async getFunctionsByFile(filePath: string): Promise<any> {
+    const response = await this.api.get(`/functions/file/${encodeURIComponent(filePath)}`);
+    return response.data;
+  }
 }
 
 // Create singleton instance
