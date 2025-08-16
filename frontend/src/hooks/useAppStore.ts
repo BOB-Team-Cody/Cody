@@ -12,7 +12,7 @@ interface AppActions {
   // UI actions
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
-  setActiveTab: (tab: 'analysis' | 'hierarchy' | 'code' | 'stats') => void;
+  setActiveTab: (tab: 'analysis' | 'hierarchy' | 'code' | 'stats' | 'refactoring') => void;
   setSelectedNode: (node: NodeData | null) => void;
   
   // 3D actions

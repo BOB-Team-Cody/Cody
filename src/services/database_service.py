@@ -259,6 +259,8 @@ class DatabaseService:
                        n.type as type,
                        n.dead as dead,
                        n.callCount as callCount,
+                       n.sourceCode as sourceCode,
+                       n.className as className,
                        incomingCalls
                 ORDER BY incomingCalls DESC
                 """
@@ -277,6 +279,8 @@ class DatabaseService:
                         "type": record["type"],
                         "dead": record["dead"] if record["dead"] is not None else False,
                         "callCount": call_count,
+                        "sourceCode": record["sourceCode"],
+                        "className": record["className"],
                         # Calculate size based on call count for Three.js visualization
                         "size": max(1.0, min(10.0, call_count * 0.5 + incoming_calls * 0.3 + 1.0))
                     }

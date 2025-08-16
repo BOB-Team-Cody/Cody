@@ -11,7 +11,8 @@ from typing import List
 from fastapi import FastAPI, HTTPException, status, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import JSONResponse
 
 from src.models.api_models import AnalyzeRequest, AnalyzeResponse, GraphDataResponse
 from src.services.analysis_service import AnalysisService
@@ -29,12 +30,13 @@ logger = setup_logger(__name__)
 analysis_service: AnalysisService = None
 database_service: DatabaseService = None
 analysis_controller: AnalysisController = None
+refactoring_agent = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management."""
-    global analysis_service, database_service, analysis_controller
+    global analysis_service, database_service, analysis_controller, refactoring_agent
     
     # Startup
     logger.info("Starting Code Weaver API...")
@@ -51,6 +53,15 @@ async def lifespan(app: FastAPI):
     
     # Initialize controller
     analysis_controller = AnalysisController(analysis_service, database_service)
+    
+    # Initialize refactoring agent
+    try:
+        from src.agents.refactoring_agent import CodeRefactoringAgent
+        refactoring_agent = CodeRefactoringAgent(database_service)
+        logger.info("Code refactoring agent initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize refactoring agent: {e}")
+        refactoring_agent = None
     
     logger.info("Code Weaver API started successfully")
     
@@ -117,6 +128,7 @@ async def root():
             "GET /functions/search/{function_name}": "Search functions by name",
             "GET /functions/id/{function_id}": "Get function by ID",
             "GET /functions/file/{file_path}": "Get functions by file",
+            "POST /refactor/{function_id}": "Refactor function with LangGraph agent",
             "GET /docs": "API documentation"
         }
     }
@@ -227,6 +239,55 @@ async def get_functions_by_file(
         List of functions in the file with their source code
     """
     return await controller.search_functions_by_file(file_path)
+
+
+@app.post("/refactor/{function_id}")
+async def refactor_function(function_id: str):
+    """
+    Refactor a function using LangGraph-based agent.
+    
+    Args:
+        function_id: The function ID to refactor
+        
+    Returns:
+        Streaming response with refactoring progress and results
+    """
+    if refactoring_agent is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Refactoring agent not available. Check OPENAI_API_KEY environment variable."
+        )
+    
+    async def generate_refactoring_stream():
+        """Generator for streaming refactoring updates."""
+        import json
+        
+        try:
+            async for update in refactoring_agent.refactor_function(function_id):
+                # Format as Server-Sent Events
+                data = json.dumps(update, ensure_ascii=False)
+                yield f"data: {data}\n\n"
+                
+        except Exception as e:
+            logger.error(f"Error in refactoring stream: {e}")
+            error_data = json.dumps({
+                "error": str(e),
+                "step": "stream_error",
+                "type": "error"
+            })
+            yield f"data: {error_data}\n\n"
+        
+        # Signal end of stream
+        yield f"data: {json.dumps({'step': 'stream_end', 'type': 'end'})}\n\n"
+    
+    return StreamingResponse(
+        generate_refactoring_stream(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+        }
+    )
 
 
 @app.get("/frontend")

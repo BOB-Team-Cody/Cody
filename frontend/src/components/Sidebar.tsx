@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
-import { Search, BarChart3, FileText, GitBranch } from 'lucide-react';
+import { Search, BarChart3, FileText, GitBranch, Wrench } from 'lucide-react';
 import { useAppStore } from '@/hooks/useAppStore';
 import { useAnalysisWorkflow } from '@/hooks/useApi';
 import AnalysisPanel from './Sidebar/AnalysisPanel';
 import StatisticsPanel from './Sidebar/StatisticsPanel';
 import CodePanel from './Sidebar/CodePanel';
 import HierarchyPanel from './Sidebar/HierarchyPanel';
+import RefactoringPanel from './Sidebar/RefactoringPanel';
 
 const Sidebar: React.FC = () => {
   const {
@@ -38,6 +39,7 @@ const Sidebar: React.FC = () => {
     { id: 'hierarchy' as const, label: '계층 뷰', icon: GitBranch },
     { id: 'stats' as const, label: '통계', icon: BarChart3 },
     { id: 'code' as const, label: '코드', icon: FileText },
+    { id: 'refactoring' as const, label: '리팩토링', icon: Wrench },
   ];
   
   return (
@@ -148,6 +150,12 @@ const Sidebar: React.FC = () => {
         
         {activeTab === 'code' && (
           <CodePanel
+            selectedNode={selectedNode}
+          />
+        )}
+        
+        {activeTab === 'refactoring' && (
+          <RefactoringPanel
             selectedNode={selectedNode}
           />
         )}

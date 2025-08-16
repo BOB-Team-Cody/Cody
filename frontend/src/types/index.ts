@@ -81,7 +81,7 @@ export interface AppState {
   
   // UI state
   sidebarOpen: boolean;
-  activeTab: 'analysis' | 'hierarchy' | 'code' | 'stats'; // Added 'hierarchy' tab
+  activeTab: 'analysis' | 'hierarchy' | 'code' | 'stats' | 'refactoring'; // Added 'hierarchy' and 'refactoring' tabs
   selectedNode: NodeData | null;
   
   // 3D state
