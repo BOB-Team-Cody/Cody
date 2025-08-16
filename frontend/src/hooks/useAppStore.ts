@@ -12,7 +12,7 @@ interface AppActions {
   // UI actions
   setSidebarOpen: (open: boolean) => void;
   toggleSidebar: () => void;
-  setActiveTab: (tab: 'analysis' | 'code' | 'stats') => void;
+  setActiveTab: (tab: 'analysis' | 'hierarchy' | 'code' | 'stats') => void;
   setSelectedNode: (node: NodeData | null) => void;
   
   // 3D actions
@@ -20,6 +20,8 @@ interface AppActions {
   setCameraTarget: (target: [number, number, number]) => void;
   setAutoRotate: (autoRotate: boolean) => void;
   toggleAutoRotate: () => void;
+  setLayoutMode: (mode: 'force-directed' | 'hierarchical') => void;
+  toggleLayoutMode: () => void;
   
   // Connection actions
   setApiConnected: (connected: boolean) => void;
@@ -49,6 +51,7 @@ const initialState: AppState = {
   cameraPosition: [0, 0, 120],
   cameraTarget: [0, 0, 0],
   autoRotate: false,
+  layoutMode: 'force-directed',
   
   // Connection state
   apiConnected: false,
@@ -105,6 +108,14 @@ export const useAppStore = create<AppStore>()(
       toggleAutoRotate: () =>
         set((state) => ({ autoRotate: !state.autoRotate }), false, 'toggleAutoRotate'),
       
+      setLayoutMode: (layoutMode) =>
+        set({ layoutMode }, false, 'setLayoutMode'),
+      
+      toggleLayoutMode: () =>
+        set((state) => ({ 
+          layoutMode: state.layoutMode === 'force-directed' ? 'hierarchical' : 'force-directed' 
+        }), false, 'toggleLayoutMode'),
+      
       // Connection actions
       setApiConnected: (apiConnected) =>
         set({ apiConnected }, false, 'setApiConnected'),
@@ -151,6 +162,7 @@ export const useAppStore = create<AppStore>()(
         sidebarOpen: state.sidebarOpen,
         activeTab: state.activeTab,
         autoRotate: state.autoRotate,
+        layoutMode: state.layoutMode,
       }),
     }
   )

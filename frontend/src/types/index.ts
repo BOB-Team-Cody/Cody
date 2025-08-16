@@ -24,11 +24,13 @@ export interface NodeData {
   dead: boolean;
   callCount: number;
   size: number;
+  lineCount?: number; // Added for code length information
 }
 
 export interface LinkData {
   source: string;
   target: string;
+  frequency?: number; // Added for call frequency information
 }
 
 export interface Statistics {
@@ -57,12 +59,14 @@ export interface Node3D extends NodeData {
   emissive: string;
   opacity: number;
   scale: number;
+  depth?: number; // Added for hierarchical layout depth information
 }
 
 export interface Edge3D extends LinkData {
   points: [number, number, number][];
   color: string;
   opacity: number;
+  frequency?: number; // Added for call frequency visualization
 }
 
 // UI State Types
@@ -75,13 +79,14 @@ export interface AppState {
   
   // UI state
   sidebarOpen: boolean;
-  activeTab: 'analysis' | 'code' | 'stats';
+  activeTab: 'analysis' | 'hierarchy' | 'code' | 'stats'; // Added 'hierarchy' tab
   selectedNode: NodeData | null;
   
   // 3D state
   cameraPosition: [number, number, number];
   cameraTarget: [number, number, number];
   autoRotate: boolean;
+  layoutMode: 'force-directed' | 'hierarchical'; // Added layout mode
   
   // Connection state
   apiConnected: boolean;
