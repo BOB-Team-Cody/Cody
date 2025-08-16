@@ -329,17 +329,44 @@ class ASTAnalyzer(ast.NodeVisitor):
                 # It's a module import, keep as current file
                 return f"{self.file_path}:{func_name}"
         
-        # Check if it's a builtin function
-        builtins = {
-            'print', 'len', 'str', 'int', 'float', 'bool', 'list', 'dict', 'set', 'tuple',
-            'range', 'enumerate', 'zip', 'map', 'filter', 'sum', 'max', 'min', 'abs',
-            'round', 'sorted', 'reversed', 'all', 'any', 'hasattr', 'getattr', 'setattr',
-            'isinstance', 'issubclass', 'type', 'open', 'input', 'hash', 'id', 'repr'
-        }
-        
-        if func_name in builtins:
+        # Check if it's a builtin function using Python's builtins module
+        if self._is_builtin_function(func_name):
             return f"builtins:{func_name}"
         
         # Default: assume it's in the same file
         return f"{self.file_path}:{func_name}"
+    
+    def _is_builtin_function(self, func_name: str) -> bool:
+        """Check if function is a Python builtin function or common method."""
+        import builtins
+        import types
+        
+        # 1. Check if it's in Python's builtins module
+        if hasattr(builtins, func_name):
+            builtin_obj = getattr(builtins, func_name)
+            return callable(builtin_obj)
+        
+        # 2. Dynamically get all builtin types from builtins module
+        builtin_types = []
+        for name in dir(builtins):
+            obj = getattr(builtins, name)
+            # Check if it's a type (class) and not a function/exception
+            if isinstance(obj, type) and not issubclass(obj, BaseException):
+                builtin_types.append(obj)
+        
+        # Check if it's a method available on any builtin type
+        for builtin_type in builtin_types:
+            if hasattr(builtin_type, func_name):
+                attr = getattr(builtin_type, func_name)
+                # Check if it's a method (callable and not a property/descriptor)
+                if callable(attr):
+                    return True
+        
+        # 3. Check object base class methods (inherited by all objects)
+        if hasattr(object, func_name):
+            attr = getattr(object, func_name)
+            if callable(attr):
+                return True
+        
+        return False
     
