@@ -76,15 +76,16 @@ module.exports = (env, argv) => {
       hot: true,
       port: 3000,
       historyApiFallback: true,
-      proxy: {
-        '/api': {
+      proxy: [
+        {
+          context: ['/api'],
           target: 'http://localhost:8000',
           changeOrigin: true,
           pathRewrite: {
             '^/api': '',
           },
         },
-      },
+      ],
     },
     optimization: {
       splitChunks: {

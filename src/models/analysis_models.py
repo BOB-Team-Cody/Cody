@@ -14,6 +14,8 @@ class CodeNode:
     dead: bool
     call_count: int
     class_name: Optional[str] = None
+    source_code: Optional[str] = None
+    class_name: Optional[str] = None
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""
@@ -24,7 +26,7 @@ class CodeNode:
             "label": self.label,
             "dead": self.dead,
             "callCount": self.call_count,
-            "className": self.class_name
+            "sourceCode": self.source_code
         }
 
 
