@@ -174,7 +174,8 @@ class DatabaseService:
                 n.file = $file,
                 n.dead = $dead,
                 n.type = $type,
-                n.callCount = $callCount
+                n.callCount = $callCount,
+                n.className = $className
             """
         elif node_type == "Class":
             query = """
@@ -183,7 +184,8 @@ class DatabaseService:
                 n.file = $file,
                 n.dead = $dead,
                 n.type = $type,
-                n.callCount = $callCount
+                n.callCount = $callCount,
+                n.className = $className
             """
         elif node_type == "Module":
             query = """
@@ -192,7 +194,8 @@ class DatabaseService:
                 n.file = $file,
                 n.dead = $dead,
                 n.type = $type,
-                n.callCount = $callCount
+                n.callCount = $callCount,
+                n.className = $className
             """
         else:
             query = """
@@ -201,7 +204,8 @@ class DatabaseService:
                 n.file = $file,
                 n.dead = $dead,
                 n.type = $type,
-                n.callCount = $callCount
+                n.callCount = $callCount,
+                n.className = $className
             """
         
         session.run(query, {
@@ -210,7 +214,8 @@ class DatabaseService:
             "file": node.file,
             "dead": node.dead,
             "type": node.type,
-            "callCount": node.call_count
+            "callCount": node.call_count,
+            "className": node.class_name
         })
     
     def _create_relationship(self, session, edge: CodeEdge) -> None:

@@ -44,6 +44,7 @@ class NodeData(BaseModel):
     dead: bool
     call_count: int
     size: float
+    class_name: str = None
 
 
 class LinkData(BaseModel):

@@ -208,6 +208,7 @@ class AnalysisController:
                 "type": node.type,
                 "dead": node.dead,
                 "callCount": node.call_count,
+                "className": node.class_name,
                 "size": 3.0 if node.type == "class" else (1.5 + node.call_count * 0.2)
             }
             self.memory_storage["nodes"].append(viz_node)
