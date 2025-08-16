@@ -201,6 +201,25 @@ class ASTAnalyzer(ast.NodeVisitor):
         self.nodes: List[CodeNode] = []
         self.edges: List[CodeEdge] = []
         self.current_scope: List[str] = []
+        self.imports: Dict[str, str] = {}  # symbol_name -> actual_module_path
+        self.symbol_definitions: Dict[str, str] = {}  # symbol_name -> definition_location
+    
+    def visit_Import(self, node: ast.Import) -> None:
+        """Visit import statements."""
+        for alias in node.names:
+            module_name = alias.name
+            import_name = alias.asname or alias.name
+            self.imports[import_name] = module_name
+    
+    def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        """Visit from...import statements."""
+        if node.module:
+            for alias in node.names:
+                symbol_name = alias.name
+                import_name = alias.asname or alias.name
+                # Convert relative path to file path format (use forward slash for consistency)
+                module_path = node.module.replace('.', '/')
+                self.imports[import_name] = f"{module_path}.py:{symbol_name}"
     
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         """Visit function definitions."""
@@ -276,7 +295,9 @@ class ASTAnalyzer(ast.NodeVisitor):
         if func_name:
             current_func = ".".join(self.current_scope) if self.current_scope else "__module__"
             caller_id = f"{self.file_path}:{current_func}"
-            callee_id = f"{self.file_path}:{func_name}"
+            
+            # Resolve target to actual definition location
+            callee_id = self._resolve_target(func_name)
             
             edge = CodeEdge(
                 source=caller_id,
@@ -295,3 +316,30 @@ class ASTAnalyzer(ast.NodeVisitor):
         elif isinstance(node, ast.Attribute):
             return node.attr
         return None
+    
+    def _resolve_target(self, func_name: str) -> str:
+        """Resolve function call target to actual definition location."""
+        # Check if it's an imported symbol
+        if func_name in self.imports:
+            resolved_location = self.imports[func_name]
+            # If it already contains file and symbol info
+            if ':' in resolved_location:
+                return resolved_location
+            else:
+                # It's a module import, keep as current file
+                return f"{self.file_path}:{func_name}"
+        
+        # Check if it's a builtin function
+        builtins = {
+            'print', 'len', 'str', 'int', 'float', 'bool', 'list', 'dict', 'set', 'tuple',
+            'range', 'enumerate', 'zip', 'map', 'filter', 'sum', 'max', 'min', 'abs',
+            'round', 'sorted', 'reversed', 'all', 'any', 'hasattr', 'getattr', 'setattr',
+            'isinstance', 'issubclass', 'type', 'open', 'input', 'hash', 'id', 'repr'
+        }
+        
+        if func_name in builtins:
+            return f"builtins:{func_name}"
+        
+        # Default: assume it's in the same file
+        return f"{self.file_path}:{func_name}"
+    
